@@ -28,6 +28,47 @@ Ejecuta [`crear-bd.sql`](crear-bd.sql) como superusuario `postgres`:
 psql -U postgres -h localhost -p 5432 -f crear-bd.sql
 ```
 
+### 2. ¿Con qué usuario se conecta el backend?
+
+Crear la base **no define el usuario**: el usuario es el de la conexión con la que el backend entra a PostgreSQL. El backend lee estas variables (valores por defecto entre paréntesis):
+
+| Variable | Qué es | Por defecto |
+|---|---|---|
+| `DB_USER` | Usuario de PostgreSQL | `kanban` |
+| `DB_PASSWORD` | Su clave | `kanban` |
+| `DB_PORT` | Puerto del servidor | `5432` |
+| `DB_NAME` | Nombre de la base | `kanban_db` |
+
+**Opción A · Usar el mismo usuario con el que entras a pgAdmin.** Casi siempre es `postgres` con la clave que definiste al instalar PostgreSQL 18. Como el proyecto trae por defecto el usuario `kanban`, aquí **sí** debes indicar el usuario y la clave antes de levantar el backend (y el puerto si no es el 5432):
+
+```powershell
+$env:DB_USER = "postgres"
+$env:DB_PASSWORD = "la_clave_de_postgres"
+# $env:DB_PORT = "5433"     # solo si tu PostgreSQL 18 no usa el 5432
+```
+
+> ¿Cuál es mi puerto? En pgAdmin: clic derecho sobre el servidor → *Properties → Connection → Port*. O en el *Query Tool*: `SHOW port;`
+
+**Opción B · Crear un usuario propio para esta aplicación** (es la que usa el proyecto por defecto: usuario `kanban`, clave `kanban`). Es lo habitual: un usuario por aplicación. En pgAdmin abre el **Query Tool sobre la base `kanban_db`** (clic derecho en `kanban_db` → *Query Tool*), pega este script y ejecútalo con **F5**:
+
+```sql
+-- Crea el usuario (o le actualiza la clave si ya existe)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'kanban') THEN
+        CREATE USER kanban WITH PASSWORD 'kanban';
+    ELSE
+        ALTER USER kanban WITH PASSWORD 'kanban';
+    END IF;
+END
+$$;
+
+-- Lo hace dueño de la base: así Flyway puede crear la tabla y los datos
+ALTER DATABASE kanban_db OWNER TO kanban;
+GRANT ALL PRIVILEGES ON DATABASE kanban_db TO kanban;
+GRANT ALL ON SCHEMA public TO kanban;
+```
+
 ## Ejecutar
 
 Se necesita Java 21 (`JAVA_HOME` apuntando a un JDK 21).
